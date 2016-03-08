@@ -1,3 +1,6 @@
 [submodule "libs"]
 	path = libs
 	url = git://github.com/cocos2d/cocos2d-html5.git
+[submodule "cocos2d-html5"]
+	path = cocos2d-html5
+	url = https://github.com/cocos2d/cocos2d-html5.git
