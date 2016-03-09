@@ -16,10 +16,21 @@
     </style>
 </head>
 <body>
-<div id="Container" style="margin: 0 auto">
+<div id="loginbox">
+    <div style="width:260px;margin:200px auto;">
+                请先输入你在聊天室的昵称
+            <br/>
+            <br/>
+            <input type="text" style="width:180px;" placeholder="请输入用户名" id="username" name="username" />
+            <input type="button" style="width:50px;" value="提交" onclick="LOBBY.usernameSubmit();"/>
+    </div>
+</div>
+<div id="Container" style="margin: 0 auto;display:none;">
     <canvas id="gameCanvas" width="320" height="480"></canvas>
 </div>
 <!--<div id="cou" style="width:320px;margin: 0 auto;"></div>-->
 <script src="MoonWarriors/MoonWarriors-html5.js"></script>
+<script src="matchvs/Lobby.js"></script>
+<script src="http://h5.matchvs.com/lib/socket.io.js"></script>
 </body>
 </html>

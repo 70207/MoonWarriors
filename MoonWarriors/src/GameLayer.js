@@ -10,7 +10,7 @@ STATE_GAMEOVER = 1;
 var GameLayer = cc.Layer.extend({
     _time:null,
     _ship:null,
-    _ship2:null,
+    _ships:{},
     _backSky:null,
     _backSkyHeight:0,
     _backSkyRe:null,
@@ -39,12 +39,13 @@ var GameLayer = cc.Layer.extend({
             MW.CONTAINER.PLAYER_BULLETS = [];
             MW.SCORE = 0;
             MW.LIFE = 4;
+            MW.LIFE2 = 4;
             this._state = STATE_PLAYING;
 
-            Explosion.sharedExplosion();
-            Enemy.sharedEnemy();
+            //Explosion.sharedExplosion();
+            //Enemy.sharedEnemy();
             winSize = cc.Director.getInstance().getWinSize();
-            this._levelManager = new LevelManager(this);
+           // this._levelManager = new LevelManager(this);
             this.initBackground();
             this.screenRect = cc.rect(0, 0, winSize.width, winSize.height + 10);
 
@@ -62,13 +63,6 @@ var GameLayer = cc.Layer.extend({
             life.setPosition(cc.p(30, 460));
             this.addChild(life, 1, 5);
 
-            //ship life 2
-            var life2 = cc.Sprite.createWithTexture(shipTexture, cc.rect(0, 0, 60, 38));
-            life2.setScale(0.6);
-            life2.setPosition(cc.p(160, 460));
-            this.addChild(life, 1, 5);
-
-
 
             // ship Life count
             this._lbLife = cc.LabelTTF.create("0", "Arial", 20);
@@ -76,22 +70,10 @@ var GameLayer = cc.Layer.extend({
             this._lbLife.setColor(cc.red());
             this.addChild(this._lbLife, 1000);
 
-            // ship2 Life count 
-            this._lbLife2 = cc.LabelTTF.create("0", "Arial", 20);
-            this._lbLife2.setPosition(cc.p(300, 463));
-            this._lbLife2.setColor(cc.red());
-            this.addChild(this._lbLife2, 1000);
 
             // ship
             this._ship = new Ship();
             this.addChild(this._ship, this._ship.zOrder, MW.UNIT_TAG.PLAYER);
-
-            //second ship
-            this._ship2 = new Ship();
-            this._ship2.setPosition(cc.p(220, 60));
-            this.addChild(this._ship2, this._ship2.zOrder, MW.UNIT_TAG.PLAYER);
-
-
 
             // accept touch now!
 
@@ -107,28 +89,100 @@ var GameLayer = cc.Layer.extend({
 
             // schedule
             this.scheduleUpdate();
-            this.schedule(this.scoreCounter, 1);
+         //   this.schedule(this.scoreCounter, 1);
 
             if (MW.SOUND) {
                 cc.AudioEngine.getInstance().playBackgroundMusic(s_bgMusic, true);
             }
 
+            var callback = {};
+            callback.gameLayer = this;
+            callback.cbRecvPos = this.onPosition;
+            callback.cbRecvLogout = this.onLogout;
+            callback.cbRecvLogin = this.onLogin;
+
+            LOBBY.init(callback);
             bRet = true;
         }
         return bRet;
     },
-    scoreCounter:function () {
-        if( this._state == STATE_PLAYING ) {
-            this._time++;
 
-            var minute = 0 | (this._time / 60);
-            var second = this._time % 60;
-            minute = minute > 9 ? minute : "0" + minute;
-            second = second > 9 ? second : "0" + second;
-            var curTime = minute + ":" + second;
-            this._levelManager.loadLevelResource(this._time);
+    appendUser:function(o){
+            var ship = new Ship(o.userid, o.username);
+            var curPos = cc.p(o.x, o.y);
+            ship.setPosition(curPos);
+            this.addChild(ship, ship.zOrder, MW.UNIT_TAG.PLAYER);
+            this._ships[o.userid] = ship;
+    },
+
+    removeUser:function(userid){
+            var ship = this._ships[userid]
+            if(ship == null){
+                return;
+            }
+
+            ship.destroy();
+            delete this._ships[userid];
+  
+    },
+
+    checkUser:function(o){
+        for(var userid in o.onlineUsers){
+            if(userid == LOBBY.userid){
+                continue;
+            }
+
+            if(this._ships.hasOwnProperty(userid)){
+                continue;
+            }
+
+            this.appendUser(o.onlineUsers[userid]);
         }
     },
+
+    onLogin:function(o){
+        var userid = o.user.userid;
+        MW.SHIP_COUNT = o.onlineCount;
+
+        var gameLayer = o.gameLayer;
+        if(LOBBY.userid == userid){
+            gameLayer.checkUser(o);
+            return;
+        }
+
+        gameLayer.appendUser(o.user);
+    },
+
+    onLogout:function(o){
+        var userid = o.user.userid;
+        MW.SHIP_COUNT = o.onlineCount;
+
+        if(LOBBY.userid == userid){
+            return;
+        }
+
+        var gameLayer = o.gameLayer;
+        gameLayer.removeUser(userid);
+    },
+
+    onPosition:function(o){
+        var userid = o.userid;
+        if(LOBBY.userid == userid){
+            return;
+        }
+
+        var gameLayer = o.gameLayer;
+
+        var ship = gameLayer._ships[userid]
+        if(ship == null){
+            return;
+        }
+
+        var Pos = {x:o.x, y:o.y};
+
+        ship.setPosition(Pos);
+    },
+
     onTouchesBegan:function(touches, event){
         this._isTouch = true;
     },
@@ -153,11 +207,7 @@ var GameLayer = cc.Layer.extend({
             curPos= cc.pAdd( curPos, delta );
             curPos = cc.pClamp(curPos, cc.POINT_ZERO, cc.p(winSize.width, winSize.height) );
             this._ship.setPosition( curPos );
-
-            var curPos = this._ship2.getPosition();
-            curPos= cc.pAdd( curPos, delta );
-            curPos = cc.pClamp(curPos, cc.POINT_ZERO, cc.p(winSize.width, winSize.height) );
-            this._ship2.setPosition( curPos );
+            LOBBY.sendPosition(curPos.x, curPos.y);
         }
     },
 
@@ -171,69 +221,14 @@ var GameLayer = cc.Layer.extend({
 
     update:function (dt) {
         if( this._state == STATE_PLAYING ) {
-            this.checkIsCollide();
             this.removeInactiveUnit(dt);
-            this.checkIsReborn();
             this.updateUI();
         }
 
         //if( cc.config.deviceType == 'browser' )
          //   cc.$("#cou").innerHTML = "Ship:" + 1 + ", Enemy: " + MW.CONTAINER.ENEMIES.length + ", Bullet:" + MW.CONTAINER.ENEMY_BULLETS.length + "," + MW.CONTAINER.PLAYER_BULLETS.length + " all:" + this.getChildren().length;
     },
-    checkIsCollide:function () {
-        var selChild, bulletChild;
-        //check collide
-        var i =0;
-        for (i = 0; i < MW.CONTAINER.ENEMIES.length; i++) {
-            selChild = MW.CONTAINER.ENEMIES[i];
-            for (var j = 0; j < MW.CONTAINER.PLAYER_BULLETS.length; j++) {
-                bulletChild = MW.CONTAINER.PLAYER_BULLETS[j];
-                if (this.collide(selChild, bulletChild)) {
-                    bulletChild.hurt();
-                    selChild.hurt();
-                }
-                if (!cc.rectIntersectsRect(this.screenRect, bulletChild.getBoundingBox() )) {
-                    bulletChild.destroy();
-                }
-            }
-            if (this.collide(selChild, this._ship)) {
-                if (this._ship.active) {
-                    selChild.hurt();
-                    this._ship.hurt();
-                }
-            }
-
-            if (this.collide(selChild, this._ship2)) {
-                if (this._ship2.active) {
-                    selChild.hurt();
-                    this._ship2.hurt();
-                }
-            }
-            if (!cc.rectIntersectsRect(this.screenRect, selChild.getBoundingBox() )) {
-                selChild.destroy();
-            }
-        }
-
-        for (i = 0; i < MW.CONTAINER.ENEMY_BULLETS.length; i++) {
-            selChild = MW.CONTAINER.ENEMY_BULLETS[i];
-            if (this.collide(selChild, this._ship)) {
-                if (this._ship.active) {
-                    selChild.hurt();
-                    this._ship.hurt();
-                }
-            }
-
-            if (this.collide(selChild, this._ship2)) {
-                if (this._ship2.active) {
-                    selChild.hurt();
-                    this._ship2.hurt();
-                }
-            }
-            if (!cc.rectIntersectsRect(this.screenRect, selChild.getBoundingBox() )) {
-                selChild.destroy();
-            }
-        }
-    },
+    
     removeInactiveUnit:function (dt) {
         var selChild, layerChildren = this.getChildren();
         for (var i in layerChildren) {
@@ -252,27 +247,12 @@ var GameLayer = cc.Layer.extend({
             }
         }
     },
-    checkIsReborn:function () {
-        if (MW.LIFE > 0 && !this._ship.active) {
-            // ship
-            this._ship = new Ship();
-            this.addChild(this._ship, this._ship.zOrder, MW.UNIT_TAG.PLAYER);
-        }
-
-        else if (MW.LIFE <= 0 && !this._ship.active) {
-            this._state = STATE_GAMEOVER;
-            // XXX: needed for JS bindings.
-            this._ship = null;
-            this.runAction(cc.Sequence.create(
-                cc.DelayTime.create(0.2),
-                cc.CallFunc.create(this, this.onGameOver)));
-        }
-    },
+    
     updateUI:function () {
         if (this._tmpScore < MW.SCORE) {
             this._tmpScore += 5;
         }
-        this._lbLife.setString(MW.LIFE);
+        this._lbLife.setString(MW.SHIP_COUNT);
         this.lbScore.setString("Score: " + this._tmpScore);
     },
     collide:function (a, b) {

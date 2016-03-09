@@ -10,18 +10,42 @@ var Ship = cc.Sprite.extend({
     zOrder:3000,
     maxBulletPowerValue:4,
     appearPosition:cc.p(100, 60),
+    userid:0,
+    username:null,
     _hurtColorLife:0,
     active:true,
+    _nameLabel:null,
     ctor:function () {
+
 
         // needed for JS-Bindings compatibility
         cc.associateWithNative( this, cc.Sprite );
+
+        if(arguments.length >= 1){
+            this.userid = arguments[0];
+        }
+
+        if(arguments.length >= 2){
+            this.username = arguments[1];
+        }
+        else{
+            this.username = MW.USER_NAME;
+        }
+
 
         //init life
         var shipTexture = cc.TextureCache.getInstance().addImage(s_ship01);
         this.initWithTexture(shipTexture, cc.rect(0, 0, 60, 38));
         this.setTag(this.zOrder);
         this.setPosition(this.appearPosition);
+
+
+        this._nameLabel = cc.LabelTTF.create("0", "Arial", 10, cc.Size(60, 20));
+        this._nameLabel.setPosition(cc.p(30, -10));
+        this._nameLabel.setColor(cc.red());
+        this.addChild(this._nameLabel, 1000);
+        this._nameLabel.setString(this.username);
+
 
         // set frame
         var frame0 = cc.SpriteFrame.createWithTexture(shipTexture, cc.rect(0, 0, 60, 38));
@@ -35,7 +59,7 @@ var Ship = cc.Sprite.extend({
         var animation = cc.Animation.create(animFrames, 0.1);
         var animate = cc.Animate.create(animation);
         this.runAction(cc.RepeatForever.create(animate));
-        this.schedule(this.shoot, 1 / 6);
+        //this.schedule(this.shoot, 1 / 6);
 
         //revive effect
         this.canBeAttack = false;
@@ -103,10 +127,13 @@ var Ship = cc.Sprite.extend({
         b.setPosition(cc.p(p.x - offset, p.y + 3 + cs.height * 0.3));
     },
     destroy:function () {
-        MW.LIFE--;
+        if(this.userid == 0){
+            MW.LIFE--;
+        }
+
         var p = this.getPosition();
         var myParent = this.getParent();
-        myParent.addChild( new Explosion(p) );
+        //myParent.addChild( new Explosion(p) );
         myParent.removeChild(this,true);
         if (MW.SOUND) {
             cc.AudioEngine.getInstance().playEffect(s_shipDestroyEffect);

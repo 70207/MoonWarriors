@@ -35,7 +35,10 @@ MW.LEVEL = {
 //life
 MW.LIFE = 4;
 
-MW.LIFE2 = 4;
+
+MW.SHIP_COUNT = 1;
+
+MW.USER_NAME="匿名"
 
 //score
 MW.SCORE = 0;
